@@ -11,8 +11,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-redis/redis/internal/flowtoken"
 	"github.com/go-redis/redis/internal/pool"
 )
+
+type FlowTokenConfig flowtoken.Config
 
 type Options struct {
 	// The network type, either tcp or unix.
@@ -84,6 +87,9 @@ type Options struct {
 
 	// TLS Config to use. When set TLS will be negotiated.
 	TLSConfig *tls.Config
+
+	// Flow token config to use.
+	FlowTokenConfig *FlowTokenConfig
 }
 
 func (opt *Options) init() {

@@ -2,15 +2,19 @@ package redis
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"os"
 	"time"
 
 	"github.com/go-redis/redis/internal"
+	"github.com/go-redis/redis/internal/flowtoken"
 	"github.com/go-redis/redis/internal/pool"
 	"github.com/go-redis/redis/internal/proto"
 )
+
+var errRedisUnavailable = errors.New("redis: Redis Server is unavailable")
 
 // Nil reply Redis returns when key does not exist.
 const Nil = proto.Nil
@@ -31,6 +35,8 @@ type baseClient struct {
 	processPipeline   func([]Cmder) error
 	processTxPipeline func([]Cmder) error
 
+	ft *flowtoken.FlowToken // can be nil
+
 	onClose func() error // hook called when client is closed
 }
 
@@ -38,6 +44,10 @@ func (c *baseClient) init() {
 	c.process = c.defaultProcess
 	c.processPipeline = c.defaultProcessPipeline
 	c.processTxPipeline = c.defaultProcessTxPipeline
+
+	if c.opt.FlowTokenConfig != nil {
+		c.ft = flowtoken.New((*flowtoken.Config)(c.opt.FlowTokenConfig))
+	}
 }
 
 func (c *baseClient) String() string {
@@ -61,6 +71,10 @@ func (c *baseClient) newConn() (*pool.Conn, error) {
 }
 
 func (c *baseClient) getConn() (*pool.Conn, error) {
+	if !c.ft.Allow() {
+		return nil, errRedisUnavailable
+	}
+
 	cn, err := c.connPool.Get()
 	if err != nil {
 		return nil, err
@@ -78,6 +92,14 @@ func (c *baseClient) getConn() (*pool.Conn, error) {
 }
 
 func (c *baseClient) releaseConn(cn *pool.Conn, err error) bool {
+	if c.ft != nil {
+		if err != nil && internal.IsRetryableError(err, true) {
+			c.ft.ReportFailure()
+		} else {
+			c.ft.ReportSuccess()
+		}
+	}
+
 	if internal.IsBadConn(err, false) {
 		c.connPool.Remove(cn)
 		return false
