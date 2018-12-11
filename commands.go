@@ -275,6 +275,7 @@ type Cmdable interface {
 	ClusterSaveConfig() *StatusCmd
 	ClusterSlaves(nodeID string) *StringSliceCmd
 	ClusterFailover() *StatusCmd
+	ClusterFailoverForce() *StatusCmd
 	ClusterAddSlots(slots ...int) *StatusCmd
 	ClusterAddSlotsRange(min, max int) *StatusCmd
 	GeoAdd(key string, geoLocation ...*GeoLocation) *IntCmd
@@ -2435,6 +2436,12 @@ func (c *cmdable) ReadWrite() *StatusCmd {
 
 func (c *cmdable) ClusterFailover() *StatusCmd {
 	cmd := NewStatusCmd("cluster", "failover")
+	c.process(cmd)
+	return cmd
+}
+
+func (c *cmdable) ClusterFailoverForce() *StatusCmd {
+	cmd := NewStatusCmd("cluster", "failover", "force")
 	c.process(cmd)
 	return cmd
 }

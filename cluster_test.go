@@ -710,7 +710,9 @@ var _ = Describe("ClusterClient", func() {
 				return nil
 			})
 			Expect(err).NotTo(HaveOccurred())
+		})
 
+		It("Should cluster failover", func() {
 			state, err := client.LoadState()
 			Eventually(func() bool {
 				state, err = client.LoadState()
@@ -722,6 +724,27 @@ var _ = Describe("ClusterClient", func() {
 
 			for _, slave := range state.Slaves {
 				err = slave.Client.ClusterFailover().Err()
+				Expect(err).NotTo(HaveOccurred())
+
+				Eventually(func() bool {
+					state, _ := client.LoadState()
+					return state.IsConsistent()
+				}, "30s").Should(BeTrue())
+			}
+		})
+
+		It("Should cluster failover force", func() {
+			state, err := client.LoadState()
+			Eventually(func() bool {
+				state, err = client.LoadState()
+				if err != nil {
+					return false
+				}
+				return state.IsConsistent()
+			}, "30s").Should(BeTrue())
+
+			for _, slave := range state.Slaves {
+				err = slave.Client.ClusterFailoverForce().Err()
 				Expect(err).NotTo(HaveOccurred())
 
 				Eventually(func() bool {
